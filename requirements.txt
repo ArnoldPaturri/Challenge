@@ -1,0 +1,12 @@
+httpx>=0.27,<0.29
+pydantic>=2.9,<3
+langchain>=0.3.27,<0.4
+langchain-community>=0.3.27,<0.4
+langchain-core>=0.3.27,<0.4
+langchain-google-genai>=2.0,<3
+pillow>=11,<12
+python-dotenv>=1,<2
+langchain-cohere>=0.4,<0.5
+pypdf>=5.0.0,<6
+streamlit>=1.30.0,<2
+faiss-cpu>=1.8.0,<2
