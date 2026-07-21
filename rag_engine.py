@@ -7,9 +7,18 @@ load_dotenv()
 
 from langchain_community.vectorstores import FAISS
 from langchain_google_genai import GoogleGenerativeAIEmbeddings, ChatGoogleGenerativeAI
-from langchain.chains.combine_documents import create_stuff_documents_chain
-from langchain.chains.retrieval import create_retrieval_chain
 from langchain_core.prompts import ChatPromptTemplate, MessagesPlaceholder
+
+# --- IMPORTACIÓN COMPATIBLE PARA LANGCHAIN 0.2 Y 0.3+ ---
+try:
+    from langchain.chains.combine_documents import create_stuff_documents_chain
+    from langchain.chains.retrieval import create_retrieval_chain
+except ModuleNotFoundError:
+    try:
+        from langchain.chains import create_stuff_documents_chain, create_retrieval_chain
+    except ModuleNotFoundError:
+        from langchain_classic.chains.combine_documents import create_stuff_documents_chain
+        from langchain_classic.chains.retrieval import create_retrieval_chain
 
 # ============================================================
 # 1. MANEJO DE API KEY (Soporta .env Local y Streamlit Cloud)
