@@ -167,9 +167,6 @@ def aplicar_estilos():
 
         /* ====================================================
            MENSAJES DEL CHAT
-           (aquí estaba el bug: no había fondo/color de texto
-           explícitos, así que heredaban del tema y en algunos
-           casos quedaba texto blanco sobre fondo blanco)
         ==================================================== */
 
         [data-testid="stChatMessage"] {{
@@ -180,8 +177,6 @@ def aplicar_estilos():
             box-shadow: 0 2px 8px rgba(15, 23, 42, 0.04);
         }}
 
-        /* Forzamos color de texto legible en TODO el contenido
-           del chat, sin importar el tema claro/oscuro del navegador */
         [data-testid="stChatMessage"] p,
         [data-testid="stChatMessage"] span,
         [data-testid="stChatMessage"] div,
@@ -189,27 +184,21 @@ def aplicar_estilos():
             color: {COLORS['chat_assistant_text']} !important;
         }}
 
-        /* Burbuja del asistente: fondo blanco */
         [data-testid="stChatMessage"]:has([data-testid="stChatMessageAvatarAssistant"]) {{
             background-color: {COLORS['chat_assistant_bg']};
         }}
 
-        /* Burbuja del usuario: fondo celeste, para diferenciarla */
         [data-testid="stChatMessage"]:has([data-testid="stChatMessageAvatarUser"]) {{
             background-color: {COLORS['chat_user_bg']};
         }}
 
         /* ====================================================
-           INPUT DEL CHAT
+           INPUT DEL CHAT & BOTONES
         ==================================================== */
 
         [data-testid="stChatInput"] {{
             border-radius: 15px;
         }}
-
-        /* ====================================================
-           BOTONES
-        ==================================================== */
 
         .stButton > button {{
             border-radius: 10px;
@@ -224,7 +213,7 @@ def aplicar_estilos():
         }}
 
         /* ====================================================
-           BADGE DE ESTADO
+           BADGE DE ESTADO & FOOTER
         ==================================================== */
 
         .status-badge {{
@@ -237,10 +226,6 @@ def aplicar_estilos():
             font-weight: 600;
             margin-top: 8px;
         }}
-
-        /* ====================================================
-           FOOTER
-        ==================================================== */
 
         .custom-footer {{
             text-align: center;
@@ -268,8 +253,10 @@ def cargar_rag():
 
 def render_sidebar():
     with st.sidebar:
-
-        st.image("assets/patu.png", use_container_width=True)
+        try:
+            st.image("assets/patu.png", use_container_width=True)
+        except Exception:
+            pass  # Si la imagen no se encuentra, continúa sin romper la app
 
         st.markdown("""
         <div class="sidebar-brand">
@@ -287,7 +274,7 @@ def render_sidebar():
             <div class="source-item">📄 Manual de monitoreo</div>
             <div class="source-item">📊 Log de emisión diaria</div>
             <div class="source-item">🧠 Base vectorial FAISS</div>
-            <div class="source-item">✨ Modelo Gemini</div>
+            <div class="source-item">✨ Gemini Pro (Alta Precisión)</div>
         </div>
         """, unsafe_allow_html=True)
 
@@ -298,8 +285,8 @@ def render_sidebar():
             st.rerun()
 
         st.markdown("---")
-        st.caption("TeleAudit Perú • Asistente RAG")
-        st.caption("Desarrollado con Gemini + LangChain + FAISS")
+        st.caption("TeleAudit Perú • Asistente RAG v1.2")
+        st.caption("Desarrollado con Gemini Pro + LangChain + FAISS")
 
 
 def render_header():
@@ -319,9 +306,9 @@ def render_info_card():
     <div class="info-card">
         <div class="info-card-title">💡 ¿Cómo puedo ayudarte?</div>
         <p class="info-card-text">
-            Realiza una pregunta sobre la documentación disponible.
-            El asistente analizará la base de conocimiento y generará
-            una respuesta utilizando información relevante de los documentos.
+            Realiza consultas específicas sobre los logs o manuales.
+            El sistema analizará exhaustivamente la base vectorial y generará
+            un listado o respuesta completa sin omitir registros.
         </p>
     </div>
     """, unsafe_allow_html=True)
@@ -334,8 +321,8 @@ def inicializar_historial():
                 "role": "assistant",
                 "content": (
                     "¡Hola! 👋 Soy el asistente virtual de TeleAudit Perú. "
-                    "Puedo ayudarte a consultar información sobre los "
-                    "manuales de monitoreo y los registros de emisión. "
+                    "Puedo ayudarte a consultar información detallada sobre los "
+                    "manuales de monitoreo y los registros de emisión diaria. "
                     "¿Qué deseas saber?"
                 )
             }
@@ -349,16 +336,27 @@ def render_historial():
 
 
 def manejar_entrada_usuario(rag_chain):
-    prompt = st.chat_input("Escribe tu pregunta aquí...")
+    prompt = st.chat_input("Escribe tu pregunta aquí (ej. ¿Qué empresas publicitaron el día 20/07?)...")
     if not prompt:
         return
 
+    # Mostrar mensaje del usuario
     st.session_state.messages.append({"role": "user", "content": prompt})
     with st.chat_message("user"):
         st.write(prompt)
 
+    # RESPUESTA RÁPIDA PARA SALUDOS (Ahorra tiempo y llamadas a la API)
+    saludos = ["hola", "buenas", "buenos dias", "buenas tardes", "buenas noches", "patu", "saludos"]
+    if prompt.strip().lower() in saludos:
+        respuesta_corta = "¡Hola! 👋 ¿En qué te puedo ayudar hoy sobre los manuales de monitoreo o los registros de emisión?"
+        st.session_state.messages.append({"role": "assistant", "content": respuesta_corta})
+        with st.chat_message("assistant"):
+            st.write(respuesta_corta)
+        return
+
+    # CONSULTA NORMAL AL MOTOR RAG
     with st.chat_message("assistant"):
-        with st.spinner("🔍 Analizando documentos..."):
+        with st.spinner("🔍 Consultando base de conocimiento..."):
             try:
                 respuesta = rag_chain.invoke({"input": prompt})["answer"]
                 st.write(respuesta)
@@ -367,7 +365,6 @@ def manejar_entrada_usuario(rag_chain):
                 )
             except Exception as e:
                 st.error(f"Ocurrió un error al procesar tu consulta: {e}")
-
 
 def render_footer():
     st.markdown("""
@@ -390,6 +387,7 @@ def main():
         rag_chain = cargar_rag()
     except Exception as e:
         st.error(f"❌ Error al cargar la base de conocimiento: {e}")
+        st.info("Asegúrate de ejecutar primero 'python lang_chain.py' para generar el índice vectorial en './faiss_index'.")
         st.stop()
 
     render_sidebar()
