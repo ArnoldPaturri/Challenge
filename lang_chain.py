@@ -1,5 +1,6 @@
 import os
 import time
+import streamlit as st
 from langchain_community.document_loaders import (
     PyPDFLoader,
     Docx2txtLoader,
@@ -9,8 +10,24 @@ from langchain_community.document_loaders import (
 from langchain_text_splitters import RecursiveCharacterTextSplitter
 from langchain_community.vectorstores import FAISS
 from langchain_google_genai import GoogleGenerativeAIEmbeddings
-from my_keys import GEMINI_API_KEY
-from my_models import EMBEDDING_MODEL
+
+# --- Manejo seguro de la API KEY para Local y Streamlit Cloud ---
+GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
+
+if not GEMINI_API_KEY and "GEMINI_API_KEY" in st.secrets:
+    GEMINI_API_KEY = st.secrets["GEMINI_API_KEY"]
+
+if not GEMINI_API_KEY:
+    try:
+        from my_keys import GEMINI_API_KEY
+    except ImportError:
+        raise ValueError("❌ No se encontró GEMINI_API_KEY en las variables de entorno, Secrets o my_keys.py")
+
+# --- Manejo seguro del Modelo de Embeddings ---
+try:
+    from my_models import EMBEDDING_MODEL
+except ImportError:
+    EMBEDDING_MODEL = "models/text-embedding-004"
 
 DOCS_DIR = "./datos"
 DB_DIR = "./faiss_index"
@@ -18,6 +35,10 @@ DB_DIR = "./faiss_index"
 def cargar_todos_los_documentos():
     documentos = []
     
+    if not os.path.exists(DOCS_DIR):
+        print(f"⚠️ La carpeta '{DOCS_DIR}' no existe.")
+        return documentos
+
     for root, _, files in os.walk(DOCS_DIR):
         for file in files:
             path = os.path.join(root, file)
@@ -56,7 +77,7 @@ def crear_vectorstore():
     )
 
     # Configuración de lotes seguros y tiempo de espera
-    batch_size = 15  # Lote pequeño para evitar alcanzar el límite de 100 por minuto
+    batch_size = 15  # Lote pequeño para evitar alcanzar el límite por minuto
     delay_between_batches = 20  # Segundos entre lotes
     vectorstore = None
 
