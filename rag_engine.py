@@ -7,7 +7,14 @@ load_dotenv()
 
 from langchain_community.vectorstores import FAISS
 from langchain_google_genai import GoogleGenerativeAIEmbeddings, ChatGoogleGenerativeAI
-from langchain_core.prompts import ChatPromptTemplate, MessagesPlaceholder
+
+# --- IMPORTACIÓN CORREGIDA PARA EL PROMPT ---
+from langchain_core.prompts import (
+    ChatPromptTemplate, 
+    MessagesPlaceholder,
+    SystemMessagePromptTemplate,
+    HumanMessagePromptTemplate
+)
 
 # Importaciones dinámicas/compatibles para LangChain
 try:
@@ -47,14 +54,12 @@ def obtener_api_key():
 def inicializar_motor_rag():
     """Carga el índice vectorial FAISS y construye la cadena de consulta RAG."""
     
-    # Obtener y validar la API Key en el momento de ejecución
     api_key = obtener_api_key()
     
     if not api_key:
         st.error("❌ No se encontró GEMINI_API_KEY en tu archivo .env (Local) ni en los Secrets de Streamlit (Nube).")
         return None
 
-    # Asignar a variables de entorno globales para librerías de Google/Pydantic
     os.environ["GEMINI_API_KEY"] = api_key
     os.environ["GOOGLE_API_KEY"] = api_key
 
@@ -62,7 +67,7 @@ def inicializar_motor_rag():
         st.error(f"⚠️ No se encontró el índice vectorial en '{DB_DIR}'. Ejecuta primero 'python lang_chain.py' para crearlo.")
         return None
 
-    # Inicializar Embeddings pasando la clave explícitamente
+    # Inicializar Embeddings
     embeddings = GoogleGenerativeAIEmbeddings(
         model=EMBEDDING_MODEL,
         google_api_key=api_key
@@ -77,7 +82,7 @@ def inicializar_motor_rag():
     
     retriever = vectorstore.as_retriever(search_kwargs={"k": 4})
 
-    # Inicializar LLM con la clave
+    # Inicializar LLM
     llm = ChatGoogleGenerativeAI(
         model=GEMINI_PRO,
         google_api_key=api_key,
@@ -92,10 +97,11 @@ def inicializar_motor_rag():
         "Contexto recuperado:\n{context}"
     )
 
+    
     prompt = ChatPromptTemplate.from_messages([
-        ("system", system_prompt),
+        SystemMessagePromptTemplate.from_template(system_prompt),
         MessagesPlaceholder(variable_name="chat_history"),
-        ("human", "{input}"),
+        HumanMessagePromptTemplate.from_template("{input}"),
     ])
 
     question_answer_chain = create_stuff_documents_chain(llm, prompt)
