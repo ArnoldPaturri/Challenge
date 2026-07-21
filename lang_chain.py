@@ -1,6 +1,10 @@
 import os
 import time
-import streamlit as st
+from dotenv import load_dotenv
+
+# Cargar automáticamente las variables del archivo .env local
+load_dotenv()
+
 from langchain_community.document_loaders import (
     PyPDFLoader,
     Docx2txtLoader,
@@ -11,17 +15,31 @@ from langchain_text_splitters import RecursiveCharacterTextSplitter
 from langchain_community.vectorstores import FAISS
 from langchain_google_genai import GoogleGenerativeAIEmbeddings
 
-# --- Manejo seguro de la API KEY para Local y Streamlit Cloud ---
-GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
+# --- Manejo seguro de la API KEY (Soporta .env, Streamlit Secrets o my_keys.py) ---
+GEMINI_API_KEY = os.getenv("GEMINI_API_KEY") or os.getenv("GOOGLE_API_KEY")
 
-if not GEMINI_API_KEY and "GEMINI_API_KEY" in st.secrets:
-    GEMINI_API_KEY = st.secrets["GEMINI_API_KEY"]
+# Si no está en el .env, intentar leer de Streamlit Secrets sin romper la terminal
+if not GEMINI_API_KEY:
+    try:
+        import streamlit as st
+        if hasattr(st, "secrets") and "GEMINI_API_KEY" in st.secrets:
+            GEMINI_API_KEY = st.secrets["GEMINI_API_KEY"]
+    except Exception:
+        pass
 
+# Fallback final a my_keys.py si se ejecuta en local
 if not GEMINI_API_KEY:
     try:
         from my_keys import GEMINI_API_KEY
     except ImportError:
-        raise ValueError("❌ No se encontró GEMINI_API_KEY en las variables de entorno, Secrets o my_keys.py")
+        pass
+
+if not GEMINI_API_KEY:
+    raise ValueError("❌ No se encontró GEMINI_API_KEY en tu archivo .env, Secrets de Streamlit ni en my_keys.py")
+
+# Asignar a las variables globales de entorno de Python
+os.environ["GEMINI_API_KEY"] = GEMINI_API_KEY
+os.environ["GOOGLE_API_KEY"] = GEMINI_API_KEY
 
 # --- Manejo seguro del Modelo de Embeddings ---
 try:
@@ -107,7 +125,7 @@ def crear_vectorstore():
                 
             except Exception as e:
                 intentos += 1
-                print(f"  ⚠️ Límite de cuota detectado en lote {num_lote}. Esperando 25 segundos para reintentar (Intento {intentos}/5)...")
+                print(f"  ⚠️ Límite de cuota o error detectado en lote {num_lote}. Esperando 25 segundos para reintentar (Intento {intentos}/5)...")
                 time.sleep(25)
 
         # Pausa preventiva entre lotes exitosos
