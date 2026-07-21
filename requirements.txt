@@ -3,6 +3,8 @@ langchain
 langchain-community
 langchain-core
 langchain-google-genai
+langchain-cohere
 faiss-cpu
 pypdf
 python-dotenv
+docx2txt

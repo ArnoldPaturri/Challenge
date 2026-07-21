@@ -8,7 +8,7 @@ load_dotenv()
 from langchain_community.vectorstores import FAISS
 from langchain_google_genai import GoogleGenerativeAIEmbeddings, ChatGoogleGenerativeAI
 
-# --- IMPORTACIÓN CORREGIDA PARA EL PROMPT ---
+# --- IMPORTACIÓN NATIVA DE PLAN TILLAS (SOLUCIONA EL ERROR DE UNPACKING) ---
 from langchain_core.prompts import (
     ChatPromptTemplate, 
     MessagesPlaceholder,
@@ -16,7 +16,7 @@ from langchain_core.prompts import (
     HumanMessagePromptTemplate
 )
 
-# Importaciones dinámicas/compatibles para LangChain
+# Importaciones de cadenas con fallbacks de compatibilidad
 try:
     from langchain.chains.combine_documents import create_stuff_documents_chain
     from langchain.chains.retrieval import create_retrieval_chain
@@ -27,7 +27,7 @@ except ModuleNotFoundError:
         from langchain_classic.chains.combine_documents import create_stuff_documents_chain
         from langchain_classic.chains.retrieval import create_retrieval_chain
 
-# Respaldo seguro para los nombres de los modelos
+# Respaldo seguro para modelos
 try:
     from my_models import EMBEDDING_MODEL, GEMINI_PRO
 except ImportError:
@@ -37,14 +37,12 @@ except ImportError:
 DB_DIR = "./faiss_index"
 
 def obtener_api_key():
-    """Busca la API Key en las Secrets de Streamlit, en .env o variables de entorno."""
-    # 1. Buscar en Streamlit Secrets (Nube)
+    """Busca la API Key en Streamlit Secrets, .env o variables de entorno."""
     if "GEMINI_API_KEY" in st.secrets:
         return st.secrets["GEMINI_API_KEY"]
     if "GOOGLE_API_KEY" in st.secrets:
         return st.secrets["GOOGLE_API_KEY"]
     
-    # 2. Buscar en variables de entorno / .env (Local)
     api_key_env = os.getenv("GEMINI_API_KEY") or os.getenv("GOOGLE_API_KEY")
     if api_key_env:
         return api_key_env
@@ -52,28 +50,26 @@ def obtener_api_key():
     return None
 
 def inicializar_motor_rag():
-    """Carga el índice vectorial FAISS y construye la cadena de consulta RAG."""
+    """Carga el índice FAISS y construye la cadena RAG."""
     
     api_key = obtener_api_key()
     
     if not api_key:
-        st.error("❌ No se encontró GEMINI_API_KEY en tu archivo .env (Local) ni en los Secrets de Streamlit (Nube).")
+        st.error("❌ No se encontró GEMINI_API_KEY en .env ni en Streamlit Secrets.")
         return None
 
     os.environ["GEMINI_API_KEY"] = api_key
     os.environ["GOOGLE_API_KEY"] = api_key
 
     if not os.path.exists(DB_DIR):
-        st.error(f"⚠️ No se encontró el índice vectorial en '{DB_DIR}'. Ejecuta primero 'python lang_chain.py' para crearlo.")
+        st.error(f"⚠️ No se encontró el índice vectorial en '{DB_DIR}'. Ejecuta primero 'python lang_chain.py'.")
         return None
 
-    # Inicializar Embeddings
     embeddings = GoogleGenerativeAIEmbeddings(
         model=EMBEDDING_MODEL,
         google_api_key=api_key
     )
 
-    # Cargar VectorStore FAISS
     vectorstore = FAISS.load_local(
         DB_DIR, 
         embeddings, 
@@ -82,14 +78,13 @@ def inicializar_motor_rag():
     
     retriever = vectorstore.as_retriever(search_kwargs={"k": 4})
 
-    # Inicializar LLM
     llm = ChatGoogleGenerativeAI(
         model=GEMINI_PRO,
         google_api_key=api_key,
         temperature=0.3
     )
 
-    system_prompt = (
+    system_prompt_text = (
         "Eres un asistente virtual experto para TeleAudit Perú. "
         "Utiliza los siguientes fragmentos de contexto recuperados para responder "
         "a la pregunta. Si no sabes la respuesta, responde honestamente que no la conoces. "
@@ -97,9 +92,11 @@ def inicializar_motor_rag():
         "Contexto recuperado:\n{context}"
     )
 
-    
+    # =========================================================================
+    # CORRECCIÓN CLAVE: Usar objetos PromptTemplate explícitos en lugar de tuplas
+    # =========================================================================
     prompt = ChatPromptTemplate.from_messages([
-        SystemMessagePromptTemplate.from_template(system_prompt),
+        SystemMessagePromptTemplate.from_template(system_prompt_text),
         MessagesPlaceholder(variable_name="chat_history"),
         HumanMessagePromptTemplate.from_template("{input}"),
     ])
